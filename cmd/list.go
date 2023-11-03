@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -77,7 +78,9 @@ var listCmd = &cobra.Command{
 	Long:  `Lists all the URLs stored in the configured Shlink service for reuse`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		fmt.Printf("Listing URLs from %s\n", viper.GetString("shlink_url"))
+		if verbose {
+			fmt.Printf("Listing URLs from %s\n", viper.GetString("shlink_url"))
+		}
 
 		URLResponse, err := getShortURLList(viper.GetString("shlink_url"), viper.GetString("api_key"), viper.GetInt("timeout"))
 		if err != nil {
@@ -86,41 +89,61 @@ var listCmd = &cobra.Command{
 		}
 
 		outputURLs := [][]string{}
-		title := []string{"Short URL", "Long URL", "Created", "Visits"}
-		outputURLs = append(outputURLs, title)
+
 		for _, shortURL := range URLResponse.SU.Data {
-			record := []string{shortURL.ShortUrl, shortURL.LongUrl, shortURL.DateCreated, fmt.Sprintf("%d", shortURL.VisitsSummary.Total)}
+			t, err := time.Parse(time.RFC3339, shortURL.DateCreated)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			longUrl := strings.Split(shortURL.LongUrl, "?")
+			record := []string{t.Format("2006-01-02"), shortURL.ShortUrl, longUrl[0], fmt.Sprintf("%d", shortURL.VisitsSummary.Total)}
 			outputURLs = append(outputURLs, record)
 		}
+
+		//Display table options and render
 		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Created", "Short URL", "Long URL", "Visits"})
+
+		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+		table.SetAutoFormatHeaders(true)
+		table.SetCenterSeparator("")
+		table.SetColumnSeparator("")
+		table.SetRowSeparator("")
+		table.SetHeaderLine(false)
+		table.SetTablePadding("\t") // pad with tabs
+		table.SetNoWhiteSpace(true)
+		table.SetBorder(false)
+
+		table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold},
+			tablewriter.Colors{tablewriter.Bold},
+			tablewriter.Colors{tablewriter.Bold},
+			tablewriter.Colors{tablewriter.Bold})
+
+		table.SetColumnColor(tablewriter.Colors{},
+			tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},
+			tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiRedColor},
+			tablewriter.Colors{})
+
 		table.SetRowSeparator("-")
 		table.SetAlignment(tablewriter.ALIGN_LEFT)
+		table.SetAutoWrapText(true)
 		table.AppendBulk(outputURLs) // Add Bulk Data
 		table.Render()
-
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+// getShortURLList returns a list of short URLs from the Shlink API
 func getShortURLList(host string, apiKey string, timeout int) (ShortUrls, error) {
 	// Get the list of short URLs
 	// GET /rest/v2/short-urls
 	// https://app.shlink.io/#/docs#operation/getShortUrls
 
-	shortURLResponse, _, err := RestRequest("GET", host+"/rest/v2/short-urls", apiKey, time.Duration(timeout)*time.Second)
+	shortURLResponse, _, err := RestRequest("GET", host+"/rest/v2/short-urls", apiKey, time.Duration(timeout)*time.Second, nil)
 	if err != nil {
 		return ShortUrls{}, err
 	}
@@ -136,7 +159,7 @@ func getShortURLList(host string, apiKey string, timeout int) (ShortUrls, error)
 }
 
 // RestRequest returns data from a REST endpoint
-func RestRequest(method string, uri string, apiKey string, timeout time.Duration) ([]byte, time.Duration, error) {
+func RestRequest(method string, uri string, apiKey string, timeout time.Duration, body io.Reader) ([]byte, time.Duration, error) {
 	start := time.Now()
 
 	restClient := http.Client{
@@ -144,13 +167,14 @@ func RestRequest(method string, uri string, apiKey string, timeout time.Duration
 	}
 
 	// Create an HTTP request with custom headers
-	req, err := http.NewRequest(method, uri, nil)
+	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	req.Header.Add("X-Api-Key", apiKey)
 	req.Header.Add("accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
 
 	// Send the HTTP request
 	resp, err := restClient.Do(req)
@@ -162,6 +186,18 @@ func RestRequest(method string, uri string, apiKey string, timeout time.Duration
 		return nil, 0, fmt.Errorf("Unauthorized")
 	}
 
+	if resp.StatusCode == 500 {
+		return nil, 0, fmt.Errorf("Internal Server Error")
+	}
+
+	if resp.StatusCode == 400 {
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return nil, 0, fmt.Errorf("%+v", string(data))
+	}
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)

@@ -21,10 +21,60 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.design/x/clipboard"
 )
+
+type shortenURLAPIResponse struct {
+	ShortCode      string `json:"shortCode"`
+	ShortUrl       string `json:"shortUrl"`
+	LongUrl        string `json:"longUrl"`
+	DeviceLongUrls struct {
+		Android interface{} `json:"android"`
+		Ios     interface{} `json:"ios"`
+		Desktop interface{} `json:"desktop"`
+	} `json:"deviceLongUrls"`
+	DateCreated   time.Time `json:"dateCreated"`
+	VisitsSummary struct {
+		Total   int `json:"total"`
+		NonBots int `json:"nonBots"`
+		Bots    int `json:"bots"`
+	} `json:"visitsSummary"`
+	Tags      []string    `json:"tags"`
+	Meta      meta        `json:"meta"`
+	Domain    interface{} `json:"domain"`
+	Title     interface{} `json:"title"`
+	Crawlable bool        `json:"crawlable"`
+}
+
+type meta struct {
+	ValidSince time.Time   `json:"validSince"`
+	ValidUntil interface{} `json:"validUntil"`
+	MaxVisits  int         `json:"maxVisits"`
+}
+
+type shortenURLAPIRequest struct {
+	LongUrl      string `json:"longUrl"`
+	CustomSlug   string `json:"customSlug,omitempty"`
+	FindIfExists bool   `json:"findIfExists"`
+}
+
+type APIResponse struct {
+	Title  string `json:"title"`
+	Type   string `json:"type"`
+	Detail string `json:"detail"`
+	Status int    `json:"status"`
+}
+
+var customSlug string
 
 // shortCmd represents the short command
 var shortCmd = &cobra.Command{
@@ -32,20 +82,67 @@ var shortCmd = &cobra.Command{
 	Short: "Shortens a long URL using the Shlink API",
 	Long:  `Shortens a given URL using the Shlink service through its API and copies it to the clipboard.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("short called")
+		URLsToShorten := []string{}
+		URLsToShorten = append(URLsToShorten, args...)
+		enableCopyToClipboard := false
+
+		if len(URLsToShorten) == 0 {
+			fmt.Println("No URLs to shorten were provided")
+			os.Exit(0)
+		}
+
+		if len(URLsToShorten) == 1 {
+			enableCopyToClipboard = true
+		}
+
+		//Shorten all URLs
+		for _, URLToShorten := range URLsToShorten {
+			fmt.Printf("Shortening %s\n", URLToShorten)
+			shortenedURL, err := shortenURL(viper.GetString("shlink_url"), viper.GetString("api_key"), viper.GetInt("timeout"), URLToShorten)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			if enableCopyToClipboard {
+				clipboard.Write(clipboard.FmtText, []byte(shortenedURL))
+			}
+
+			color.Blue(shortenedURL)
+
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(shortCmd)
 
-	// Here you will define your flags and configuration settings.
+	shortCmd.PersistentFlags().StringVarP(&customSlug, "slug", "g", "", "Set a specific slug for the shortened URL")
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// shortCmd.PersistentFlags().String("foo", "", "A help for foo")
+func shortenURL(host string, apiKey string, timeout int, URLToShorten string) (string, error) {
+	var shortResponse shortenURLAPIResponse
+	buildBody := shortenURLAPIRequest{
+		LongUrl:      URLToShorten,
+		FindIfExists: true,
+	}
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// shortCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	if customSlug != "" {
+		buildBody.CustomSlug = customSlug
+	}
+	payloadBytes, err := json.Marshal(buildBody)
+	if err != nil {
+		return "", err
+	}
+
+	suResponse, _, err1 := RestRequest("POST", host+"/rest/v2/short-urls", apiKey, time.Duration(timeout)*time.Second, bytes.NewBuffer(payloadBytes))
+	if err1 != nil {
+		return "", err1
+	}
+
+	err = json.Unmarshal(suResponse, &shortResponse)
+	if err != nil {
+		return "", err
+	}
+
+	return shortResponse.ShortUrl, nil
 }

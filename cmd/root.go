@@ -29,13 +29,18 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var ApplicationVersion = ""
+var (
+	cfgFile string
+	verbose bool
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "shrt",
-	Short: "An alternative Shlink service application to shorten URLs",
-	Long:  `An alternative Shlink service application to interact with a Shlink instance without having to install the official client and server.`,
+	Use:     "shrt",
+	Version: ApplicationVersion,
+	Short:   "An alternative Shlink service application to shorten URLs",
+	Long:    `An alternative Shlink service application to interact with a Shlink instance without having to install the official client and server.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -54,7 +59,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.shrt.yaml)")
-
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "config file (default is $HOME/.shrt.yaml)")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -80,16 +85,16 @@ func initConfig() {
 	}
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	if err := viper.ReadInConfig(); err != nil {
+		_ = fmt.Errorf("Error reading config file: %s", viper.ConfigFileUsed())
 	}
 
 	// Environment variables take precedence over config options
-	// viper.SetEnvPrefix("shrt")
-	// viper.AutomaticEnv() // read in environment variables that match
-	// _ = viper.BindEnv("shlink_url")
-	// _ = viper.BindEnv("api_key")
-	// _ = viper.BindEnv("timeout")
+	viper.SetEnvPrefix("shrt")
+	viper.AutomaticEnv() // read in environment variables that match
+	_ = viper.BindEnv("shlink_url")
+	_ = viper.BindEnv("api_key")
+	_ = viper.BindEnv("timeout")
 
 	if viper.Get("api_key") == "" {
 		_ = fmt.Errorf("API Key not set")
