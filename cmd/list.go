@@ -73,12 +73,13 @@ type ShortUrls struct {
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Lists all the URLs shortened in the configured Shlink service",
-	Long:  `Lists all the URLs stored in the configured Shlink service for reuse`,
+	Use:     "list",
+	Version: ApplicationVersion,
+	Short:   "Lists all the URLs shortened in the configured Shlink service",
+	Long:    `Lists all the URLs stored in the configured Shlink service for reuse`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		if verbose {
+		if !quiet {
 			fmt.Printf("Listing URLs from %s\n", viper.GetString("shlink_url"))
 		}
 

@@ -78,9 +78,10 @@ var customSlug string
 
 // shortCmd represents the short command
 var shortCmd = &cobra.Command{
-	Use:   "short",
-	Short: "Shortens a long URL using the Shlink API",
-	Long:  `Shortens a given URL using the Shlink service through its API and copies it to the clipboard.`,
+	Use:     "short",
+	Version: ApplicationVersion,
+	Short:   "Shortens a long URL using the Shlink API",
+	Long:    `Shortens a given URL using the Shlink service through its API and copies it to the clipboard.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		URLsToShorten := []string{}
 		URLsToShorten = append(URLsToShorten, args...)
