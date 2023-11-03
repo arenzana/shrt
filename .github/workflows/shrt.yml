@@ -1,32 +1,37 @@
-name: MTB
+name: shrt
 on:
   push:
-    branches-ignore:
-      - main
-  workflow_dispatch:
-concurrency:
-  group: "${{ github.ref }}"
-  cancel-in-progress: true
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  earthly:
-    runs-on:
-      - ubuntu-latest
-      #- self-hosted
-    steps:
-      - uses: earthly/actions-setup@v1
+    build:
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          version: "latest"
-      - uses: actions/checkout@v2
-      - name: Docker login # to avoid dockerhub rate-limiting
-        run: echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login ghcr.io --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-        #run: docker login https://ghcr.io --username "${{ secrets.DOCKERHUB_USERNAME }}" --password "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}"
-      - name: what version is installed?
-        run: earthly --version
-      - uses: actions/checkout@v3.5.0
-        with:
-          fetch-depth: 20
-          lfs: true
-      - run: earthly config global.disable_log_sharing true
-      - run: earthly +build-all
+          go-version: '1.21'
+          check-latest: true
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+    golangci:
+      name: lint
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - uses: actions/setup-go@v4
+          with:
+            go-version: '1.21'
+            cache: false
+        - name: golangci-lint
+          uses: golangci/golangci-lint-action@v3.7.0
+          with:
+            version: v1.54.2

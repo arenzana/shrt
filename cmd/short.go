@@ -99,7 +99,9 @@ var shortCmd = &cobra.Command{
 
 		//Shorten all URLs
 		for _, URLToShorten := range URLsToShorten {
-			fmt.Printf("Shortening %s\n", URLToShorten)
+			if !quiet {
+				fmt.Printf("Shortening %s\n", URLToShorten)
+			}
 			shortenedURL, err := shortenURL(viper.GetString("shlink_url"), viper.GetString("api_key"), viper.GetInt("timeout"), URLToShorten)
 			if err != nil {
 				fmt.Println(err)

@@ -29,10 +29,12 @@ jobs:
           automatic_release_tag: v${{ steps.getversion.outputs.version }}
           prerelease: false
 
-  # Generate SBOM and scan artifacts
+  # Goreleaser
   release-artifacts:
     needs: release_new_tag
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -47,9 +49,4 @@ jobs:
           distribution: goreleaser
           version: latest
           args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: anchore/scan-action@v3
-        id: scan
-        with:
-          path: "."
+
