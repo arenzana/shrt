@@ -55,7 +55,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.SetVersionTemplate("Version: ")
+	rootCmd.SetVersionTemplate("Version: {{.Version}}\n")
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.shrt.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", true, "config file (default is $HOME/.shrt.yaml)")
