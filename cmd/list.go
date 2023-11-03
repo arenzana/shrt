@@ -74,6 +74,7 @@ type ShortUrls struct {
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:     "list",
+	Aliases: []string{"ls"},
 	Version: ApplicationVersion,
 	Short:   "Lists all the URLs shortened in the configured Shlink service",
 	Long:    `Lists all the URLs stored in the configured Shlink service for reuse`,

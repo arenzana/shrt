@@ -16,7 +16,7 @@ builds:
       - windows
       - darwin
     ldflags:
-      - shrt/cmd.Version={{.Version}}
+      - -X cmd.Version={{.Version}}
 
 archives:
   - format: tar.gz
